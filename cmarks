@@ -3,7 +3,7 @@
 # Author: Brad Frank
 # Date: August 2021
 # Tested: zsh 5.8 (x86_64-apple-darwin20.1.0)
-# Requires: fzf, bat; Recommended: gh
+# Requires: fzf, gh
 #
 # To get started:
 #   1. Source this file (add `source /path/to/cmarks` to your `.zshrc`)
@@ -31,24 +31,15 @@
 #   * Sync is rudimentary, use with caution.
 #
 
-export CMARKS_CONFIG=$HOME/.config/cmarks
+[[ -z $CMARKS_CONFIG ]] && export CMARKS_CONFIG="$HOME/.config/cmarks"
 
-if [[ ! -s "$CMARKS_CONFIG" ]]; then
+if [[ -s "$CMARKS_CONFIG" ]]; then
   echo "CMARKS_FILE=$HOME/.cmarks" >> "$CMARKS_CONFIG"
   echo "CMARKS_GIST=" >> "$CMARKS_CONFIG"
 fi
 
-alias cma='cmarks -a'
-alias cmd='cmarks -d'
-alias cmf='cmarks -f'
-alias cml='cmarks -l'
-alias cmp='cmarks -p'
-alias cmr='cmarks -r'
-alias cms='cmarks -s'
-alias fcl='fc -l'
-
 function cmarks() {
-  [[ ! -x $(which fzf) || ! -x $(which bat) ]] && { echo "Missing dependencies."; return 1; }
+  [[ ! -x $(which fzf) ]] && { echo "Missing fzf."; return 1; }
   source "$CMARKS_CONFIG"; [[ -f "$CMARKS_FILE" ]] || touch "$CMARKS_FILE"
 
   _cm_usage() {
@@ -65,32 +56,38 @@ function cmarks() {
   _cm_gist_sync() {
     gh auth status &> /dev/null || { echo "Not authenticated to GitHub." >&2; return 1; }
     [[ -z $CMARKS_GIST ]] && { echo "No Gist ID set." >&2; return 1; }
-    case $OPTARG in push) _cm_gist_push ;; pull) _cm_gist_pull ;; *) { _cm_usage >&2; return 1; } ;; esac
-    return $?
+    case $1 in push) _cm_gist_push ;; pull) _cm_gist_pull ;; *) { _cm_usage >&2; return 1; } ;; esac
   }
-  _cm_gist_pull() { sort -u =(gh gist view "$CMARKS_GIST"; cat "$CMARKS_FILE") > "$CMARKS_FILE"; }
-  _cm_gist_push() { VISUAL='tee' gh gist edit "$CMARKS_GIST" < "$CMARKS_FILE" > /dev/null; }
-  _cm_arg() { cut -d, -f$1 <<< $OPTARG; }
-  _cm_fzfind() { fzf --ansi -i --exit-0 --height=50% --no-multi --inline-info --border rounded < "$1"; }
-  _cm_println() { sed "${OPTARG}!d" "$CMARKS_FILE" | sed -E "s/${date_regex}\s+//"; }
-  _cm_compact() { cat =(awk NF "$CMARKS_FILE") > "$CMARKS_FILE"; }
 
-  local date_regex="^[0-9]{4}(-[0-9]+){2}\s(:?[0-9]+){2}" rc
+  _cm_append() {
+    local cmd; cmd="$(awk --field-separator '  ' '{print $2}' "$1")"
+    case "$SHELL" in
+      *zsh*)  fc -R =("$cmd"); return $? ;;
+      *bash*) history -s "$cmd"; return $? ;;
+      *)      echo "Shell not supported."; return 1 ;;
+    esac
+  }
+
+  _cm_arg() { cut --delimiter , --fields $1 <<< $OPTARG; }
+  _cm_compact() { cat <(awk NF "$CMARKS_FILE") > "$CMARKS_FILE"; }
+  _cm_count_lines() { wc --lines "$CMARKS_FILE" | awk '{print $1}' | tr --delete '\n' | wc --chars }
+  _cm_find() { fzf --ansi -i --exit-0 --height=50% --no-multi --inline-info --border rounded < "$CMARKS_FILE"; }
+  _cm_gist_pull() { { gh gist view "$CMARKS_GIST" && cat "$CMARKS_FILE"; } | sort --unique > "$CMARKS_FILE"; }
+  _cm_gist_push() { VISUAL='tee' gh gist edit "$CMARKS_GIST" < "$CMARKS_FILE" > /dev/null; }
 
   while getopts ':ha:d:flp:r:s:' flag; do
     case "$flag" in
       h)  _cm_usage; return 0 ;;
-      a)  fc -lin "$(_cm_arg 1)" "$(_cm_arg 2)" >> "$CMARKS_FILE"; rc=$?; _cm_compact; return $rc ;;
-      d)  sed -i "${OPTARG}d" "$CMARKS_FILE"; rc=$?; _cm_compact; return $rc ;;
-      f)  fc -R =(_cm_fzfind "$CMARKS_FILE" | sed -E "s/${date_regex}\s+//"); return $? ;;
-      l)  bat --number "$CMARKS_FILE"; return $? ;;
-      p)  _cm_println; return $? ;;
-      r)  fc -R =(_cm_println); return $? ;;
-      s)  _cm_gist_sync; return $? ;;
+      a)  fc -lin "$(_cm_arg 1)" "$(_cm_arg 2)" >> "$CMARKS_FILE"; _cm_compact ;;
+      d)  sed --in-place "${OPTARG}d" "$CMARKS_FILE"; _cm_compact ;;
+      f)  _cm_append "$(_cm_find)" ;;
+      l)  nl --number-width "$(_cm_count_lines)" --number-format rn "$CMARKS_FILE" ;;
+      p)  sed "${OPTARG}!d" "$CMARKS_FILE" ;;
+      r)  _cm_append "$(sed "${OPTARG}!d" "$CMARKS_FILE")" ;;
+      s)  _cm_gist_sync "$OPTARG" ;;
       \?) echo "cmarks: invalid option -$OPTARG" >&2 ;;
       :)  echo "cmarks: option -$OPTARG requires an argument" >&2 ;;
+      *)  echo; _cm_usage >&2; return 1 ;;
     esac
   done
-
-  echo; _cm_usage >&2; return 1
 }
