@@ -59,6 +59,6 @@ Add a range of commands to cmarks (also works for delete/retrieve/print):
 
 ## Notes
 
-- Bookmarked commands have separate index numbers than zsh history
+- Bookmarked commands have separate index numbers than shell history
 - Index numbers are re-assigned when bookmarks are removed
 - Sync is rudimentary, use with caution
