@@ -1,34 +1,9 @@
-#
+
 # Bookmarks CLI commands so they don't get lost in history.
 # Author: Brad Frank
 # Date: August 2021
 # Tested: zsh 5.8 (x86_64-apple-darwin20.1.0)
 # Requires: fzf, gh
-#
-# To get started:
-#   1. Source this file (add `source /path/to/cmarks` to your `.zshrc`)
-#
-# To use sync:
-#   1. Create a GitHub Gist (private or public) and note the hash ID (in the url)
-#   2. Add the Gist hash ID to the config file
-#
-# Help:
-#   Find the history index number for a recent command:
-#   `fc -l`
-#
-#   Add a single command to cmarks (also works for delete/retrieve/print):
-#   `cmarks -a <num>`
-#
-#   Add the previous command to cmarks:
-#   `cmarks -a -1`
-#
-#   Add a range of commands to cmarks (also works for delete/retrieve/print):
-#   `cmarks -a <num1>,<num2>`
-#
-# Notes:
-#   * Bookmarked commands have separate index numbers than zsh history.
-#   * Index numbers are re-assigned when bookmarks are removed.
-#   * Sync is rudimentary, use with caution.
 #
 
 [[ -z $CMARKS_CONFIG ]] && export CMARKS_CONFIG="$HOME/.config/cmarks"
@@ -38,8 +13,7 @@ if [[ -s "$CMARKS_CONFIG" ]]; then
   echo "CMARKS_GIST=" >> "$CMARKS_CONFIG"
 fi
 
-function cmarks() {
-  [[ ! -x $(which fzf) ]] && { echo "Missing fzf."; return 1; }
+cmarks() {
   source "$CMARKS_CONFIG"; [[ -f "$CMARKS_FILE" ]] || touch "$CMARKS_FILE"
 
   _cm_usage() {
@@ -56,7 +30,11 @@ function cmarks() {
   _cm_gist_sync() {
     gh auth status &> /dev/null || { echo "Not authenticated to GitHub." >&2; return 1; }
     [[ -z $CMARKS_GIST ]] && { echo "No Gist ID set." >&2; return 1; }
-    case $1 in push) _cm_gist_push ;; pull) _cm_gist_pull ;; *) { _cm_usage >&2; return 1; } ;; esac
+    case $1 in
+      push) _cm_gist_push ;;
+      pull) _cm_gist_pull ;;
+      *)    _cm_usage >&2; return 1 ;;
+    esac
   }
 
   _cm_append() {
@@ -64,7 +42,7 @@ function cmarks() {
     case "$SHELL" in
       *zsh*)  fc -R =("$cmd"); return $? ;;
       *bash*) history -s "$cmd"; return $? ;;
-      *)      echo "Shell not supported."; return 1 ;;
+      *)      echo "Shell not supported." >&2; return 1 ;;
     esac
   }
 
@@ -72,7 +50,7 @@ function cmarks() {
   _cm_compact() { cat <(awk NF "$CMARKS_FILE") > "$CMARKS_FILE"; }
   _cm_count_lines() { wc --lines "$CMARKS_FILE" | awk '{print $1}' | tr --delete '\n' | wc --chars }
   _cm_find() { fzf --ansi -i --exit-0 --height=50% --no-multi --inline-info --border rounded < "$CMARKS_FILE"; }
-  _cm_gist_pull() { { gh gist view "$CMARKS_GIST" && cat "$CMARKS_FILE"; } | sort --unique > "$CMARKS_FILE"; }
+  _cm_gist_pull() { { gh gist view "$CMARKS_GIST" && cat "$CMARKS_FILE"; } | awk '!x[$0]++' > "$CMARKS_FILE"; }
   _cm_gist_push() { VISUAL='tee' gh gist edit "$CMARKS_GIST" < "$CMARKS_FILE" > /dev/null; }
 
   while getopts ':ha:d:flp:r:s:' flag; do
