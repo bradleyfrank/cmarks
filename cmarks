@@ -8,7 +8,8 @@
 
 [[ -z $CMARKS_CONFIG ]] && export CMARKS_CONFIG="$HOME/.config/cmarks"
 
-if [[ -s "$CMARKS_CONFIG" ]]; then
+if [[ ! -s "$CMARKS_CONFIG" ]]; then
+  mkdir -p "$(dirname "$CMARKS_CONFIG")"
   echo "CMARKS_FILE=$HOME/.cmarks" >> "$CMARKS_CONFIG"
   echo "CMARKS_GIST=" >> "$CMARKS_CONFIG"
 fi
@@ -30,32 +31,26 @@ cmarks() {
   _cm_gist_sync() {
     gh auth status &> /dev/null || { echo "Not authenticated to GitHub." >&2; return 1; }
     [[ -z $CMARKS_GIST ]] && { echo "No Gist ID set." >&2; return 1; }
-    case $1 in
-      push) _cm_gist_push ;;
-      pull) _cm_gist_pull ;;
-      *)    _cm_usage >&2; return 1 ;;
-    esac
+    case $1 in push) _cm_gist_push ;; pull) _cm_gist_pull ;; *) _cm_usage >&2; return 1 ;; esac
   }
 
   _cm_append() {
-    local cmd; cmd="$(awk --field-separator '  ' '{print $2}' "$1")"
-    case "$SHELL" in
-      *zsh*)  fc -R =("$cmd"); return $? ;;
-      *bash*) history -s "$cmd"; return $? ;;
-      *)      echo "Shell not supported." >&2; return 1 ;;
-    esac
+    local rc tmp; tmp="$(mktemp)"; echo "$1" > "$tmp"
+    case "$SHELL" in *zsh*) fc -R "$tmp" ;; *bash*) history -s "$(cat "$tmp")" ;; *) return 1 ;; esac
+    rc=$?; rm -f "$tmp"; return $rc
   }
 
   _cm_compact() { cat <(awk NF "$CMARKS_FILE") > "$CMARKS_FILE"; }
-  _cm_count_lines() { wc --lines "$CMARKS_FILE" | awk '{print $1}' | tr --delete '\n' | wc --chars }
+  _cm_count_lines() { wc --lines "$CMARKS_FILE" | awk '{print $1}' | tr --delete '\n' | wc --chars; }
   _cm_find() { fzf --ansi -i --exit-0 --height=50% --no-multi --inline-info --border rounded < "$CMARKS_FILE"; }
   _cm_gist_pull() { { gh gist view "$CMARKS_GIST" && cat "$CMARKS_FILE"; } | awk '!x[$0]++' > "$CMARKS_FILE"; }
   _cm_gist_push() { VISUAL='tee' gh gist edit "$CMARKS_GIST" < "$CMARKS_FILE" > /dev/null; }
+  _cm_sanitize() { awk --field-separator '^[[:space:]]{0,1}[[:digit:]]+[[:space:]]+' '{print $2}'; }
 
   while getopts ':ha:d:flp:r:s:' flag; do
     case "$flag" in
       h)  _cm_usage; return 0 ;;
-      a)  fc -lin "{$OPTARG//,/ }" >> "$CMARKS_FILE"; _cm_compact ;;
+      a)  fc -l "{$OPTARG//,/ }" | _cm_sanitize >> "$CMARKS_FILE"; _cm_compact ;;
       d)  sed --in-place "${OPTARG}d" "$CMARKS_FILE"; _cm_compact ;;
       f)  _cm_append "$(_cm_find)" ;;
       l)  nl --number-width "$(_cm_count_lines)" --number-format rn "$CMARKS_FILE" ;;
