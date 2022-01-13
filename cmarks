@@ -1,3 +1,5 @@
+#!/usr/bin/env zsh
+
 #
 # Bookmarks CLI commands so they don't get lost in history.
 # Author: Brad Frank
@@ -15,6 +17,8 @@ if [[ ! -s "$CMARKS_CONFIG" ]]; then
 fi
 
 cmarks() {
+  local datex; datex='^[0-9]{4}(-[0-9]+){2}[[:space:]](:?[0-9]+){2}[[:space:]]{2}'
+
   source "$CMARKS_CONFIG"; [[ -f "$CMARKS_FILE" ]] || touch "$CMARKS_FILE"
 
   _cm_usage() {
@@ -22,9 +26,9 @@ cmarks() {
     echo "-a <num1>[,<num2>]    Add commands from history"
     echo "-d <num1>[,<num2>]    Delete commands from bookmarks"
     echo "-f                    Use fzf to find commands in bookmarks and append to history"
+    echo "-g <num1>[,<num2>]    Get commands from bookmarks and append to history"
     echo "-l                    List all commands in bookmarks"
     echo "-p <num1>[,<num2>]    Print commands to stdout from bookmarks"
-    echo "-r <num1>[,<num2>]    Retrieve commands from bookmarks and append to history"
     echo "-s push|pull          Sync bookmarks with GitHub gist"
   }
 
@@ -34,32 +38,25 @@ cmarks() {
     case $1 in push) _cm_gist_push ;; pull) _cm_gist_pull ;; *) _cm_usage >&2; return 1 ;; esac
   }
 
-  _cm_append() {
-    local rc tmp; tmp="$(mktemp)"; echo "$1" > "$tmp"
-    case "$SHELL" in *zsh*) fc -R "$tmp" ;; *bash*) history -s "$(cat "$tmp")" ;; *) return 1 ;; esac
-    rc=$?; rm -f "$tmp"; return $rc
-  }
-
   _cm_compact() { cat <(awk NF "$CMARKS_FILE") > "$CMARKS_FILE"; }
   _cm_count_lines() { wc --lines "$CMARKS_FILE" | awk '{print $1}' | tr --delete '\n' | wc --chars; }
   _cm_find() { fzf --ansi -i --exit-0 --height=50% --no-multi --inline-info --border rounded < "$CMARKS_FILE"; }
   _cm_gist_pull() { { gh gist view "$CMARKS_GIST" && cat "$CMARKS_FILE"; } | awk '!x[$0]++' > "$CMARKS_FILE"; }
   _cm_gist_push() { VISUAL='tee' gh gist edit "$CMARKS_GIST" < "$CMARKS_FILE" > /dev/null; }
-  _cm_sanitize() { awk --field-separator '^[[:space:]]{0,1}[[:digit:]]+[[:space:]]+' '{print $2}'; }
+  _cm_strip_date() { awk --field-separator "$datex" '{print $2}'; }
 
   while getopts ':ha:d:flp:r:s:' flag; do
     case "$flag" in
-      h)  _cm_usage; return 0 ;;
-      a)  fc -l "{$OPTARG//,/ }" | _cm_sanitize >> "$CMARKS_FILE"; _cm_compact ;;
-      d)  sed --in-place "${OPTARG}d" "$CMARKS_FILE"; _cm_compact ;;
-      f)  _cm_append "$(_cm_find)" ;;
-      l)  nl --number-width "$(_cm_count_lines)" --number-format rn "$CMARKS_FILE" ;;
-      p)  sed "${OPTARG}!d" "$CMARKS_FILE" ;;
-      r)  _cm_append "$(sed "${OPTARG}!d" "$CMARKS_FILE")" ;;
-      s)  _cm_gist_sync "$OPTARG" ;;
-      \?) echo "cmarks: invalid option -$OPTARG" >&2 ;;
-      :)  echo "cmarks: option -$OPTARG requires an argument" >&2 ;;
-      *)  echo; _cm_usage >&2; return 1 ;;
+      a) fc -lin "{$OPTARG//,/ }" >> "$CMARKS_FILE"; _cm_compact ;;
+      d) sed --in-place "${OPTARG}d" "$CMARKS_FILE"; _cm_compact ;;
+      f) fc -R =(_cm_find | _cm_strip_date) ;;
+      g) fc -R =(sed "${OPTARG}!d" "$CMARKS_FILE" | _cm_strip_date) ;;
+      h) _cm_usage; return 0 ;;
+      l) nl --number-width "$(_cm_count_lines)" --number-format rn "$CMARKS_FILE" ;;
+      p) sed "${OPTARG}!d" "$CMARKS_FILE" ;;
+      s) _cm_gist_sync "$OPTARG" ;;
+     \?) echo "cmarks: invalid option -$OPTARG" >&2; _cm_usage ;;
+      :) echo "cmarks: option -$OPTARG requires an argument" >&2; _cm_usage ;;
     esac
   done
 }
