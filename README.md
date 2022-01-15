@@ -111,7 +111,8 @@ Usage: cmarks [OPTION]
    % fc -l
     2476  ansible-lint playbooks/site.yml
     2477  ansible-playbook playbooks/site.yml
-    2478  podman pull fedora
+    2478  cmarks -g 2
+    2479  podman pull fedora
    ```
 
 5. Delete a bookmarked command:
