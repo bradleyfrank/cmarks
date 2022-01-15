@@ -13,35 +13,41 @@ Requirements:
 To get started:
 
 1. Save the `cmarks` file locally
-2. Add `source /path/to/cmarks` to your `.zshrc`
+2. Add `source path/to/cmarks` to your `.zshrc`
 
 To use sync:
 
-1. Create a GitHub Gist (private or public) and note the hash ID (in the url)
-2. Add the Gist hash ID to the config file
+* Through GitHub.com:
+   1. Create a GitHub Gist (private or public)
+   2. Note the hash ID (in the url)
+   3. Add the Gist hash ID to the config file
+* With `cmarks`:
+  1. Run `cmarks -z [private|public]` (this will automatically update the config)
 
 ## Configuration
 
-To override the default config location (`~/.config/cmarks`), add `export CMARKS_CONFIG=/my/cmarks/config` before sourcing `cmarks`.
+To override the default config location (`~/.config/cmarks.cfg`), add `export CMARKS_CONFIG=/my/cmarks/config` before sourcing.
 
 Options for the config file are as follows:
 
 ```text
-CMARKS_FILE=
-CMARKS_GIST=
+cmarks_file=
+github_gist_id=
 ```
 
 ## Usage
 
 ```text
 Usage: cmarks [OPTION]
--a <num1>[,<num2>]    Add commands from history
--d <num1>[,<num2>]    Delete commands from bookmarks
--f                    Use fzf to find commands in bookmarks and append to history
--g <num1>[,<num2>]    Get commands from bookmarks and append to history
--l                    List all commands in bookmarks
--p <num1>[,<num2>]    Print commands to stdout from bookmarks
--s push|pull          Sync bookmarks with GitHub gist
+-a <num1>[,<num2>]    Add command(s) from history to bookmarks
+-d <num1>[,<num2>]    Delete bookmarked command(s)
+-f                    Find bookmarked command(s) and append to history
+-g <num1>[,<num2>]    Get bookmarked command(s) and append to history
+-h                    Show help and usage
+-l                    List all bookmarked commands
+-p <num1>[,<num2>]    Print bookmarked command(s) to stdout
+-s push|pull          Sync bookmarks with GitHub Gist
+-z public|private     Create new GitHub Gist for syncing (default: private)
 ```
 
 ### Examples

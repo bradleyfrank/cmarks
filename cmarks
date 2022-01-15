@@ -8,62 +8,79 @@
 # Requires: fzf, gh
 #
 
+_cm_usage() {
+  echo "Usage: cmarks [OPTION]"
+  echo "-a <num1>[,<num2>]    Add command(s) from history to bookmarks"
+  echo "-d <num1>[,<num2>]    Delete bookmarked command(s)"
+  echo "-f                    Find bookmarked command(s) and append to history"
+  echo "-g <num1>[,<num2>]    Get bookmarked command(s) and append to history"
+  echo "-h                    Show help and usage"
+  echo "-l                    List all bookmarked commands"
+  echo "-p <num1>[,<num2>]    Print bookmarked command(s) to stdout"
+  echo "-s push|pull          Sync bookmarks with GitHub Gist"
+  echo "-z public|private     Create new GitHub Gist for syncing (default: private)"
+}
+
+_cm_gh_auth_status() {
+  gh auth status &> /dev/null || { echo "Not authenticated. Run \`gh auth login\` first." >&2; return 1; }
+}
+
+_cm_gist_pre_checks() {
+  _cm_gh_auth_status
+  [[ -z $github_gist_id ]] && { echo "No Gist ID set." >&2; return 1; }
+
+  local gist_files
+  if gist_files="$(gh gist view "$github_gist_id" --files 2> /dev/null)"; then
+    grep -q "cmarks" <<< $gist_files || { echo "File 'cmarks' not in Gist." >&2; return 1; }
+  else
+    echo "Gist ID does not exist." >&2; return 1;
+  fi
+}
+
+_cm_gist_sync() {
+  _cm_gist_pre_checks
+
+  case $1 in
+      push) VISUAL='tee' gh gist edit --filename "cmarks" "$github_gist_id" < "$cmarks_file" > /dev/null ;;
+      pull) sort --unique =(gh gist view --filename "cmarks" "$github_gist_id" && < "$cmarks_file") > "$cmarks_file" ;;
+         *) return 1 ;;
+  esac
+}
+
+_cm_gist_create() {
+  _cm_gh_auth_status
+
+  local gist_url content; content="# TODO: \`cmarks -s push\`"
+  case "$1" in
+    public) gist_url="$(gh gist create --desc "cmarks" --filename "cmarks" <<< "$content" --public 2> /dev/null)" ;;
+         *) gist_url="$(gh gist create --desc "cmarks" --filename "cmarks" <<< "$content" 2> /dev/null)" ;;
+  esac
+  sed -i'' "s/^github_gist_id=.*/github_gist_id=$(basename $gist_url)/" "$cmarks_file"
+}
+
+_cm_compact() { cat <(awk NF "$cmarks_file") > "$cmarks_file"; }
+_cm_width_padding() { wc --lines "$cmarks_file" | awk '{print $1}' | tr --delete '\n' | wc --chars; }
+_cm_find() { fzf --ansi -i --exit-0 --height=50% --no-multi --inline-info --border rounded < "$cmarks_file"; }
+_cm_strip_date() { awk --field-separator "$datex" '{print $2}'; }
+
+
 cmarks() {
   readonly datex="^[0-9]{4}(-[0-9]+){2}[[:space:]](:?[0-9]+){2}[[:space:]]{2}" \
            default_config="$HOME/.config/cmarks.cfg"
   local    cmarks_config; cmarks_config="${CMARKS_CONFIG:-$default_config}"
 
   if [[ ! -s "$cmarks_config" ]]; then
-    echo "Creating a default config at $cmarks_config ..."
+    echo "Creating a default config at $cmarks_config..."
     mkdir --parents "$(dirname "$cmarks_config")"
-    printf "%s\n%s\n%s\n%s" \
-      'cmarks_file="~/.cmarks"' \
-      'github_gist_id=' \
-      'github_gist_public="false"' \
-    > "$cmarks_config"
+    echo 'cmarks_file="~/.cmarks"' >> "$cmarks_config"
+    echo 'github_gist_id=' >> "$cmarks_config"
   fi
 
   source "$cmarks_config"
+  [[ -z $cmarks_file ]] && cmarks_file="$HOME/.cmarks"
   [[ -f "$cmarks_file" ]] || touch "$cmarks_file"
 
-  _cm_usage() {
-    echo "Usage: cmarks [OPTION]"
-    echo "-a <num1>[,<num2>]    Add command(s) from history to bookmarks"
-    echo "-d <num1>[,<num2>]    Delete bookmarked command(s)"
-    echo "-f                    Find bookmarked command(s) and append to history"
-    echo "-g <num1>[,<num2>]    Get bookmarked command(s) and append to history"
-    echo "-h                    Show help and usage"
-    echo "-l                    List all bookmarked commands"
-    echo "-p <num1>[,<num2>]    Print bookmarked command(s) to stdout"
-    echo "-s push|pull          Sync bookmarks with GitHub gist"
-  }
-
-  _cm_gist_sync() {
-    _cm_gist_pre_checks
-    case $1 in
-        push) VISUAL='tee' gh gist edit --filename "cmarks" "$github_gist_id" < "$cmarks_file" > /dev/null ;;
-        pull) sort --unique =(gh gist view --filename "cmarks" "$github_gist_id" && < "$cmarks_file") > "$cmarks_file" ;;
-           *) return 1 ;;
-    esac
-  }
-
-  _cm_gist_pre_checks() {
-    local gist_files
-    gh auth status &> /dev/null || { echo "Not authenticated. Run \`gh auth login\` first." >&2; return 1; }
-    [[ -z $github_gist_id ]] && { echo "No Gist ID set." >&2; return 1; }
-    if gist_files="$(gh gist view "$github_gist_id" --files 2> /dev/null)"; then
-      grep -q "cmarks" <<< $gist_files || { echo "File 'cmarks' not in Gist." >&2; return 1; }
-    else
-      echo "Gist ID does not exist." >&2; return 1;
-    fi
-  }
-
-  _cm_compact() { cat <(awk NF "$cmarks_file") > "$cmarks_file"; }
-  _cm_width_padding() { wc --lines "$cmarks_file" | awk '{print $1}' | tr --delete '\n' | wc --chars; }
-  _cm_find() { fzf --ansi -i --exit-0 --height=50% --no-multi --inline-info --border rounded < "$cmarks_file"; }
-  _cm_strip_date() { awk --field-separator "$datex" '{print $2}'; }
-
-  while getopts ':a:d:fg:hlp:s:' flag; do
+  while getopts ':a:d:fg:hlp:s:z:' flag; do
     case "$flag" in
       a) fc -lin "{$OPTARG//,/ }" >> "$cmarks_file"; _cm_compact ;;
       d) sed --in-place "${OPTARG}d" "$cmarks_file"; _cm_compact ;;
@@ -73,6 +90,7 @@ cmarks() {
       l) nl --number-width "$(_cm_width_padding)" --number-format rn "$cmarks_file" ;;
       p) sed "${OPTARG}!d" "$cmarks_file" ;;
       s) _cm_gist_sync "$OPTARG" ;;
+      z) _cm_gist_create "$OPTARG" ;;
      \?) echo "cmarks: invalid option -$OPTARG" >&2; _cm_usage; return 1 ;;
       :) echo "cmarks: option -$OPTARG requires an argument" >&2; _cm_usage; return 1 ;;
     esac
