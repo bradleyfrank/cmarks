@@ -39,30 +39,93 @@ github_gist_id=
 
 ```text
 Usage: cmarks [OPTION]
--a <num1>[,<num2>]    Add command(s) from history to bookmarks
--d <num1>[,<num2>]    Delete bookmarked command(s)
--f                    Find bookmarked command(s) and append to history
--g <num1>[,<num2>]    Get bookmarked command(s) and append to history
+-B                    Add command(s) from history to bookmarks [uses fzf]
+-b <num1>[-<num2>]    Add command(s) from history to bookmarks
+-D                    Delete bookmarked command(s) [uses fzf]
+-d <num1>[-<num2>]    Delete bookmarked command(s)
 -h                    Show help and usage
 -l                    List all bookmarked commands
--p <num1>[,<num2>]    Print bookmarked command(s) to stdout
+-P                    Print bookmarked command(s) to stdout [uses fzf]
+-p <num1>[-<num2>]    Print bookmarked command(s) to stdout
+-R                    Get bookmarked command(s) and append to history [uses fzf]
+-r <num1>[-<num2>]    Get bookmarked command(s) and append to history
 -s push|pull          Sync bookmarks with GitHub Gist
 -z public|private     Create new GitHub Gist for syncing (default: private)
 ```
 
 ### Examples
 
-Find the history index number for a recent command:
-`fc -l`
+1. Find the history index number for a recent command:
 
-Add a single command to cmarks (also works for delete/get/print):
-`cmarks -a <num>`
+   ```sh
+   % fc -l
+    2387  glow README.md
+    2388  podman machine start
+    2389  podman pull fedora
+    2390  podman run -it fedora bash
+    2391  podman machine stop
+   ```
 
-Add the previous command to cmarks:
-`cmarks -a -1`
+2. Add a command to cmarks:
 
-Add a range of commands to cmarks (also works for delete/get/print):
-`cmarks -a <num1>,<num2>`
+   ```sh
+   % cmarks -a 2388
+   % cmarks -l
+      1 2022-15-01 13:20  podman machine start
+   ```
+
+   You can also reference previous commands with negative numbers:
+
+   ```sh
+   % cmarks -a -1
+   % cmarks -l
+      1 2022-15-01 13:30  podman machine stop
+   ```
+
+   Or use a range to capture multiple commands:
+
+   ```sh
+   % cmarks -a 2388,2390
+   % cmarks -l
+      1 2022-15-01 13:20  podman machine start
+      2 2022-15-01 13:25  podman pull fedora
+      3 2022-15-01 13:30  podman run -it fedora bash
+   ```
+
+3. Print a bookmarked command:
+
+   ```sh
+   % cmarks -p 3
+   podman run -it fedora bash
+   ```
+
+4. Get a bookmarked command and append to history:
+
+   ```sh
+   % fc -l
+    2476  ansible-lint playbooks/site.yml
+    2477  ansible-playbook playbooks/site.yml
+   % cmarks -g 2
+   ```
+
+   Press `↑` to quickly access the command. You can also see the command in your history:
+
+   ```sh
+   % fc -l
+    2476  ansible-lint playbooks/site.yml
+    2477  ansible-playbook playbooks/site.yml
+    2478  cmarks -g 2
+    2479  podman pull fedora
+   ```
+
+5. Delete a bookmarked command:
+
+   ```sh
+   % cmarks -d 2
+   % cmarks -l
+      1 2022-15-01 13:20  podman machine start
+      2 2022-15-01 13:30  podman run -it fedora bash
+   ```
 
 ## Notes
 
