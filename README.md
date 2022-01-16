@@ -39,13 +39,16 @@ github_gist_id=
 
 ```text
 Usage: cmarks [OPTION]
--a <num1>[,<num2>]    Add command(s) from history to bookmarks
--d <num1>[,<num2>]    Delete bookmarked command(s)
--f                    Find bookmarked command(s) and append to history
--g <num1>[,<num2>]    Get bookmarked command(s) and append to history
+-B                    Add command(s) from history to bookmarks [uses fzf]
+-b <num1>[-<num2>]    Add command(s) from history to bookmarks
+-D                    Delete bookmarked command(s) [uses fzf]
+-d <num1>[-<num2>]    Delete bookmarked command(s)
 -h                    Show help and usage
 -l                    List all bookmarked commands
--p <num1>[,<num2>]    Print bookmarked command(s) to stdout
+-P                    Print bookmarked command(s) to stdout [uses fzf]
+-p <num1>[-<num2>]    Print bookmarked command(s) to stdout
+-R                    Get bookmarked command(s) and append to history [uses fzf]
+-r <num1>[-<num2>]    Get bookmarked command(s) and append to history
 -s push|pull          Sync bookmarks with GitHub Gist
 -z public|private     Create new GitHub Gist for syncing (default: private)
 ```
