@@ -85,7 +85,7 @@ Usage: cmarks [OPTION]
    Or use a range to capture multiple commands:
 
    ```sh
-   % cmarks -a 2388,2390
+   % cmarks -a 2388-2390
    % cmarks -l
       1 2022-15-01 13:20  podman machine start
       2 2022-15-01 13:25  podman pull fedora
