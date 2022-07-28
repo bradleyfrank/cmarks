@@ -45,7 +45,7 @@ _cm_gist_sync() {
   _cm_gist_pre_checks || return 1
   case "$1" in
       push) VISUAL='tee' gh gist edit --filename "cmarks" "$github_gist_id" < "$cmarks_file" > /dev/null ;;
-      pull) sort -u =(gh gist view --filename "cmarks" "$github_gist_id" && < "$cmarks_file") > "$cmarks_file" ;;
+      pull) sort -u =(gh gist view --filename "cmarks" "$github_gist_id" && cat "$cmarks_file") > "$cmarks_file" ;;
          *) return 1 ;;
   esac
 }
